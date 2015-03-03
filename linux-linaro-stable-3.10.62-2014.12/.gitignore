@@ -55,6 +55,8 @@ modules.builtin
 #
 !.gitignore
 !.mailmap
+# qadahtm: don't want to ignore .config, since we are building for arm only
+!.config
 
 #
 # Generated include files
