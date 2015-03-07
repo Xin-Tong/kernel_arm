@@ -98,3 +98,5 @@ x509.genkey
 run_prof.sh
 ../.DS_Store
 ../._.DS_Store
+.config
+
