@@ -3870,8 +3870,14 @@ __setscheduler(struct rq *rq, struct task_struct *p, int policy, int prio)
 			}
 #endif
 	}
-	else
+	else if (policy == SCHED_MYCFS)
+    {
+        p->sched_class = &mycfs_sched_class;
+    }
+    else
+    {
 		p->sched_class = &fair_sched_class;
+    }
 	set_load_weight(p);
 }
 
@@ -3898,7 +3904,7 @@ static int __sched_setscheduler(struct task_struct *p, int policy,
 	unsigned long flags;
 	const struct sched_class *prev_class;
 	struct rq *rq;
-	int reset_on_fork;
+    int reset_on_fork;
 
 	/* may grab non-irq protected spin_locks */
 	BUG_ON(in_interrupt());
@@ -3913,7 +3919,7 @@ recheck:
 
 		if (policy != SCHED_FIFO && policy != SCHED_RR &&
 				policy != SCHED_NORMAL && policy != SCHED_BATCH &&
-				policy != SCHED_IDLE)
+				policy != SCHED_IDLE && policy != SCHED_MYCFS)
 			return -EINVAL;
 	}
 
@@ -4040,6 +4046,11 @@ recheck:
 	task_rq_unlock(rq, p, &flags);
 
 	rt_mutex_adjust_pi(p);
+    
+    if (policy == SCHED_MYCFS) {
+        printk(KERN_EMERG "set scheduler to mycfs!\n");
+//        printk(KERN_EMERG "running = %d, on_rq = %d!\n", running, on_rq);
+    }
 
 	return 0;
 }
@@ -4131,7 +4142,8 @@ SYSCALL_DEFINE2(sched_setparam, pid_t, pid, struct sched_param __user *, param)
 SYSCALL_DEFINE1(sched_getscheduler, pid_t, pid)
 {
 	struct task_struct *p;
-	int retval;
+    int retval;
+    printk(KERN_EMERG "hahahha   you see? I'm here to get the scheduler!\n");
 
 	if (pid < 0)
 		return -EINVAL;
@@ -4605,6 +4617,7 @@ SYSCALL_DEFINE1(sched_get_priority_max, int, policy)
 	case SCHED_NORMAL:
 	case SCHED_BATCH:
 	case SCHED_IDLE:
+    case SCHED_MYCFS:
 		ret = 0;
 		break;
 	}

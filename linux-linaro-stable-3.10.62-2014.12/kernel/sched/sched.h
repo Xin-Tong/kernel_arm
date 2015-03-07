@@ -387,6 +387,21 @@ extern struct root_domain def_root_domain;
 
 #endif /* CONFIG_SMP */
 
+#define MAX_JOBS_IN_MYCFS 100
+struct mycfs_rq {
+    struct load_weight load;
+    unsigned int nr_running, h_nr_running;
+    
+    u64 exec_clock;
+    u64 min_vruntime;
+    int whose_turn;
+    
+    struct sched_entity *curr, *next, *last, *skip;
+    struct sched_entity *jobs[MAX_JOBS_IN_MYCFS];
+    
+    struct rq *rq;	/* cpu runqueue to which this cfs_rq is attached */
+};
+
 /*
  * This is the main, per-CPU runqueue data structure.
  *
@@ -422,6 +437,7 @@ struct rq {
 
 	struct cfs_rq cfs;
 	struct rt_rq rt;
+    struct mycfs_rq mycfs;
 
 #ifdef CONFIG_FAIR_GROUP_SCHED
 	/* list of leaf cfs_rq on this cpu: */
@@ -1029,6 +1045,7 @@ extern const struct sched_class stop_sched_class;
 extern const struct sched_class rt_sched_class;
 extern const struct sched_class fair_sched_class;
 extern const struct sched_class idle_sched_class;
+extern const struct sched_class mycfs_sched_class;
 
 
 #ifdef CONFIG_SMP
