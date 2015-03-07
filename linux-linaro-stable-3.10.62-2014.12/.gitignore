@@ -96,3 +96,5 @@ x509.genkey
 
 #added by jianqiao
 run_prof.sh
+../.DS_Store
+../._.DS_Store
