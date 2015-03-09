@@ -1018,6 +1018,11 @@ struct sched_entity {
 	struct cfs_rq		*cfs_rq;
 	/* rq "owned" by this entity/group: */
 	struct cfs_rq		*my_q;
+    
+    /* rq on which this entity is (to be) queued: */
+    struct mycfs_rq		*mycfs_rq;
+    /* rq "owned" by this entity/group: */
+    struct mycfs_rq		*mymy_q;
 #endif
 
 /*

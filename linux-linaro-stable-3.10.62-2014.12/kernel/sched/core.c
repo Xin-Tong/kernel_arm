@@ -4046,11 +4046,6 @@ recheck:
 	task_rq_unlock(rq, p, &flags);
 
 	rt_mutex_adjust_pi(p);
-    
-    if (policy == SCHED_MYCFS) {
-        printk(KERN_EMERG "set scheduler to mycfs!\n");
-//        printk(KERN_EMERG "running = %d, on_rq = %d!\n", running, on_rq);
-    }
 
 	return 0;
 }
@@ -4143,7 +4138,6 @@ SYSCALL_DEFINE1(sched_getscheduler, pid_t, pid)
 {
 	struct task_struct *p;
     int retval;
-    printk(KERN_EMERG "hahahha   you see? I'm here to get the scheduler!\n");
 
 	if (pid < 0)
 		return -EINVAL;
@@ -7035,7 +7029,8 @@ void __init sched_init(void)
 		rq->calc_load_active = 0;
 		rq->calc_load_update = jiffies + LOAD_FREQ;
 		init_cfs_rq(&rq->cfs);
-		init_rt_rq(&rq->rt, rq);
+        init_rt_rq(&rq->rt, rq);
+        init_mycfs_rq(&rq->mycfs);
 #ifdef CONFIG_FAIR_GROUP_SCHED
 		root_task_group.shares = ROOT_TASK_GROUP_LOAD;
 		INIT_LIST_HEAD(&rq->leaf_cfs_rq_list);
