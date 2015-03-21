@@ -1,0 +1,2 @@
+kernel/fs/isofs/isofs.ko:
+kernel/drivers/scsi/scsi_wait_scan.ko:
