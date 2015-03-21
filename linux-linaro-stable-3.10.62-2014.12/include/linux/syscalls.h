@@ -196,7 +196,7 @@ extern struct trace_event_functions exit_syscall_print_funcs;
 	SYSCALL_ALIAS(sys##name, SyS##name);				\
 	static inline long SYSC##name(__MAP(x,__SC_DECL,__VA_ARGS__))
 //Xin
-asmlinkage int sched_setlimit(pid_t pid, int limit);
+asmlinkage long sys_sched_setlimit(pid_t pid, int limit);
 //Xin end
 asmlinkage long sys_time(time_t __user *tloc);
 asmlinkage long sys_stime(time_t __user *tptr);
