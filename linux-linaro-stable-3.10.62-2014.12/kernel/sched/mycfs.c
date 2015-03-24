@@ -91,6 +91,8 @@ static void __dequeue_entity(struct mycfs_rq *mycfs_rq, struct sched_entity *se)
 static inline void update_stats_curr_start(struct mycfs_rq *mycfs_rq, struct sched_entity *se);
 static void set_next_entity(struct mycfs_rq *mycfs_rq, struct sched_entity *se);
 static struct task_struct *pick_next_task_mycfs(struct rq *rq);
+static void check_preempt_tick(struct mycfs_rq *mycfs_rq, struct sched_entity *curr);
+static void entity_tick(struct cfs_rq *cfs_rq, struct sched_entity *curr, int queued);
 void init_mycfs_rq(struct mycfs_rq *mycfs_rq);
 static void AutoSort(struct mycfs_rq *mycfs_rq);
 
@@ -392,6 +394,44 @@ account_entity_enqueue(struct mycfs_rq *mycfs_rq, struct sched_entity *se)
 #endif
     mycfs_rq->nr_running++;
     printk(KERN_EMERG "this from account_entity_enqueue, mycfs enqueue has %d tasks!\n", mycfs_rq->nr_running);
+    printk(KERN_EMERG "this from account_entity_enqueue, mycfs enqueue has %d tasks!\n", mycfs_rq->nr_running);
+    
+    
+#ifdef CONFIG_SCHEDSTATS
+    printk(KERN_EMERG "CONFIG_SCHEDSTATS!\n");
+#endif
+    
+#ifdef CONFIG_SCHED_DEBUG
+    printk(KERN_EMERG "CONFIG_SCHED_DEBUG!\n");
+#endif
+    
+#ifdef CONFIG_FAIR_GROUP_SCHED
+    printk(KERN_EMERG "CONFIG_FAIR_GROUP_SCHED!\n");
+#endif
+    
+#ifdef CONFIG_CFS_BANDWIDTH
+    printk(KERN_EMERG "CONFIG_CFS_BANDWIDTH!\n");
+#endif
+    
+#ifdef CONFIG_SMP
+    printk(KERN_EMERG "CONFIG_SMP!\n");
+#endif
+    
+#ifdef CONFIG_SCHED_HMP
+    printk(KERN_EMERG "CONFIG_HMP_FREQUENCY_INVARIANT_SCALE!\n");
+#endif
+    
+#ifdef CONFIG_SCHED_HRTICK
+    printk(KERN_EMERG "CONFIG_SCHED_HRTICK!\n");
+#endif
+    
+#ifdef CONFIG_CPU_IDLE
+    printk(KERN_EMERG "CONFIG_CPU_IDLE!\n");
+#endif
+    
+#ifdef CONFIG_PREEMPT
+    printk(KERN_EMERG "CONFIG_SCHED_HRTICK!\n");
+#endif
 }
 
 static void
@@ -644,12 +684,34 @@ dequeue_task_mycfs(struct rq *rq, struct task_struct *p, int flags)
     dec_nr_running(rq);
 }
 
-static void put_prev_task_mycfs(struct rq *rq, struct task_struct *prev)
+static void put_prev_entity(struct mycfs_rq *mycfs_rq, struct sched_entity *prev)
 {
+    /*
+     * If still on the runqueue then deactivate_task()
+     * was not called and update_curr() has to be done:
+     */
+    if (prev->on_rq)
+        update_curr(mycfs_rq);
+    
+    if (prev->on_rq) {
+        update_stats_wait_start(mycfs_rq, prev);
+        /* Put 'current' back into the tree. */
+        __enqueue_entity(mycfs_rq, prev);
+        /* in !on_rq case, update occurred at dequeue */
+//cam        update_entity_load_avg(prev, 1);
+    }
+    mycfs_rq->curr = NULL;
 }
 
-static void task_tick_mycfs(struct rq *rq, struct task_struct *curr, int queued)
+static void put_prev_task_mycfs(struct rq *rq, struct task_struct *prev)
 {
+    struct sched_entity *se = &prev->se;
+    struct mycfs_rq *mycfs_rq;
+    
+    for_each_sched_entity(se) {
+        mycfs_rq = cfs_rq_of(se);
+        put_prev_entity(mycfs_rq, se);
+    }
 }
 
 static void set_curr_task_mycfs(struct rq *rq)
@@ -769,7 +831,6 @@ set_next_entity(struct mycfs_rq *mycfs_rq, struct sched_entity *se)
     se->prev_sum_exec_runtime = se->sum_exec_runtime;
 }
 
-static int visit = 10;
 static struct task_struct *pick_next_task_mycfs(struct rq *rq)
 {
     struct task_struct *p;
@@ -779,10 +840,6 @@ static struct task_struct *pick_next_task_mycfs(struct rq *rq)
     if (!mycfs_rq->nr_running)
         return NULL;
     
-    visit --;
-    if (visit < 0) {
-        return NULL;
-    }
     se = pick_next_entity(mycfs_rq);
     set_next_entity(mycfs_rq, se);
     
@@ -793,6 +850,77 @@ static struct task_struct *pick_next_task_mycfs(struct rq *rq)
     
     return p;
     
+}
+
+/*
+ * Preempt the current task with a newly woken task if needed:
+ */
+static void
+check_preempt_tick(struct mycfs_rq *mycfs_rq, struct sched_entity *curr)
+{
+    unsigned long ideal_runtime, delta_exec;
+    struct sched_entity *se;
+    s64 delta;
+    
+    ideal_runtime = sched_slice(mycfs_rq, curr);
+    delta_exec = curr->sum_exec_runtime - curr->prev_sum_exec_runtime;
+    if (delta_exec > ideal_runtime) {
+        resched_task(rq_of(mycfs_rq)->curr);
+        /*
+         * The current task ran long enough, ensure it doesn't get
+         * re-elected due to buddy favours.
+         */
+//cam        clear_buddies(mycfs_rq, curr);
+        return;
+    }
+    
+    /*
+     * Ensure that a task that missed wakeup preemption by a
+     * narrow margin doesn't have to wait for a full slice.
+     * This also mitigates buddy induced latencies under load.
+     */
+    if (delta_exec < sysctl_sched_min_granularity)
+        return;
+    
+    se = mycfs_rq->least;
+    if (se) {
+        return NULL;
+    }
+    delta = curr->vruntime - se->vruntime;
+    
+    if (delta < 0)
+        return;
+    
+    if (delta > ideal_runtime)
+        resched_task(rq_of(mycfs_rq)->curr);
+}
+
+static void
+entity_tick(struct cfs_rq *cfs_rq, struct sched_entity *curr, int queued)
+{
+    /*
+     * Update run-time statistics of the 'current'.
+     */
+    update_curr(cfs_rq);
+    
+    if (cfs_rq->nr_running > 1)
+        check_preempt_tick(cfs_rq, curr);
+}
+
+/*
+ * scheduler tick hitting a task of our scheduling class:
+ */
+static void task_tick_mycfs(struct rq *rq, struct task_struct *curr, int queued)
+{
+    struct mycfs_rq *mycfs_rq;
+    struct sched_entity *se = &curr->se;
+    
+    for_each_sched_entity(se) {
+        mycfs_rq = cfs_rq_of(se);
+        entity_tick(mycfs_rq, se, queued);
+    }
+        
+//    update_rq_runnable_avg(rq, 1);
 }
 
 /*
@@ -825,15 +953,11 @@ const struct sched_class mycfs_sched_class = {
 void init_mycfs_rq(struct mycfs_rq *mycfs_rq)
 {
     int i;
-//    mycfs_rq->tasks_timeline = RB_ROOT;
+    mycfs_rq->tasks_timeline = RB_ROOT;
     mycfs_rq->h_nr_running = 0;
     for (i = 0; i < MAX_JOBS_IN_MYCFS; i ++) {
         mycfs_rq->jobs[i] = NULL;
     }
     mycfs_rq->min_vruntime = (u64)(-(1LL << 20));
-#ifndef CONFIG_64BIT
-    mycfs_rq->min_vruntime_copy = mycfs_rq->min_vruntime;
-#endif
-
 }
 
