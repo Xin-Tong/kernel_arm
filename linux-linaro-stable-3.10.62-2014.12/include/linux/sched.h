@@ -1063,7 +1063,13 @@ enum perf_event_task_context {
 };
 
 struct task_struct {
-	volatile long state;	/* -1 unrunnable, 0 runnable, >0 stopped */
+
+    int enough;
+    u64 quit_time;
+    
+    
+    
+    volatile long state;	/* -1 unrunnable, 0 runnable, >0 stopped */
 	void *stack;
 	atomic_t usage;
 	unsigned int flags;	/* per process flags, defined below */

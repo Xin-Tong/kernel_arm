@@ -7822,10 +7822,18 @@ static unsigned int get_rr_interval_fair(struct rq *rq, struct task_struct *task
 	return rr_interval;
 }
 
+static void show_name_cfs(struct rq *rq)
+{
+    printk(KERN_EMERG "this info from scheduler: cfs!\n");
+}
+
 /*
  * All the scheduling class methods:
  */
 const struct sched_class fair_sched_class = {
+    
+    .show_name = show_name_cfs,
+    
 	.next			= &mycfs_sched_class,
 	.enqueue_task		= enqueue_task_fair,
 	.dequeue_task		= dequeue_task_fair,

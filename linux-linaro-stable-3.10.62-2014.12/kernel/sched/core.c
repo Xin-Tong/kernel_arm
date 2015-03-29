@@ -694,6 +694,11 @@ void sched_avg_update(struct rq *rq)
 #else /* !CONFIG_SMP */
 void resched_task(struct task_struct *p)
 {
+//    if (strncmp(p->comm, "mycfs", TASK_COMM_LEN) == 0) {
+//        printk(KERN_EMERG "Task %s required a resched!\t", p->comm);
+//        p->sched_class->show_name(task_rq(p));
+//    }
+    
 	assert_raw_spin_locked(&task_rq(p)->lock);
 	set_tsk_need_resched(p);
 }
@@ -1331,6 +1336,16 @@ static void ttwu_activate(struct rq *rq, struct task_struct *p, int en_flags)
 static void
 ttwu_do_wakeup(struct rq *rq, struct task_struct *p, int wake_flags)
 {
+    if (strncmp(rq->curr->comm, "mycfs", TASK_COMM_LEN) == 0) {
+        if (strncmp(p->comm, "rsyslogd", TASK_COMM_LEN) == 0
+        ||  strncmp(p->comm, "kworker/0:0", TASK_COMM_LEN) == 0)
+        {
+            return;
+        } else {
+//            printk(KERN_EMERG "####### %s casued a resched!", p->comm);
+        }
+    }
+    
 	check_preempt_curr(rq, p, wake_flags);
 	trace_sched_wakeup(p, true);
 
@@ -2770,6 +2785,9 @@ void scheduler_tick(void)
 	update_rq_clock(rq);
 	update_cpu_load_active(rq);
 	curr->sched_class->task_tick(rq, curr, 0);
+    
+    check_task_mycfs(rq);
+    
 	raw_spin_unlock(&rq->lock);
 
 	perf_event_task_tick();

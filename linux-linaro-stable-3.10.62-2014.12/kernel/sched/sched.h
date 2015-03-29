@@ -394,13 +394,15 @@ struct mycfs_rq {
     
     u64 exec_clock;
     u64 min_vruntime;
-#ifndef CONFIG_64BIT
     u64 min_vruntime_copy;
-#endif
+
     struct sched_entity *least;
     
     struct sched_entity *curr, *next, *last, *skip;
+    
     struct sched_entity *jobs[MAX_JOBS_IN_MYCFS + 1];
+    struct rb_root tasks_timeline;
+    struct rb_node *rb_leftmost;
     
     struct rq *rq;	/* cpu runqueue to which this cfs_rq is attached */
 };
@@ -995,6 +997,9 @@ static const u32 prio_to_wmult[40] = {
 #define DEQUEUE_SLEEP		1
 
 struct sched_class {
+    
+    void (*show_name)(struct rq *rq);
+    
 	const struct sched_class *next;
 
 	void (*enqueue_task) (struct rq *rq, struct task_struct *p, int flags);
@@ -1348,6 +1353,7 @@ extern void print_rt_stats(struct seq_file *m, int cpu);
 extern void init_cfs_rq(struct cfs_rq *cfs_rq);
 extern void init_rt_rq(struct rt_rq *rt_rq, struct rq *rq);
 extern void init_mycfs_rq(struct mycfs_rq *mycfs_rq);
+extern void check_task_mycfs(struct rq *rq);
 
 extern void cfs_bandwidth_usage_inc(void);
 extern void cfs_bandwidth_usage_dec(void);
