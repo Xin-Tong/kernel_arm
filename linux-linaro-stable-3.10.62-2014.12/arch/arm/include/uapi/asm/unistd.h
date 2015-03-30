@@ -406,6 +406,9 @@
 #define __NR_process_vm_writev		(__NR_SYSCALL_BASE+377)
 #define __NR_kcmp			(__NR_SYSCALL_BASE+378)
 #define __NR_finit_module		(__NR_SYSCALL_BASE+379)
+//Xin
+#define __NR_sched_setlimit		(__NR_SYSCALL_BASE+380)
+//Xin end
 
 /*
  * This may need to be greater than __NR_last_syscall+1 in order to

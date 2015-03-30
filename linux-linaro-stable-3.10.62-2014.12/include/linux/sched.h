@@ -1065,6 +1065,7 @@ enum perf_event_task_context {
 struct task_struct {
 
     int enough;
+    int limit;
     u64 quit_time;
     
     

@@ -1749,7 +1749,14 @@ void sched_fork(struct task_struct *p)
 	}
 
 	if (!rt_prio(p->prio))
-		p->sched_class = &fair_sched_class;
+    {
+        if (p->policy == SCHED_MYCFS) {
+            p->sched_class = &mycfs_sched_class;
+        }
+        else {
+            p->sched_class = &fair_sched_class;
+        }
+    }
 
 	if (p->sched_class->task_fork)
 		p->sched_class->task_fork(p);
@@ -8154,4 +8161,22 @@ void dump_cpu_task(int cpu)
 {
 	pr_info("Task dump for CPU %d:\n", cpu);
 	sched_show_task(cpu_curr(cpu));
+}
+
+SYSCALL_DEFINE2(sched_setlimit, pid_t, pid, int, limit)
+{
+    struct task_struct *p = find_process_by_pid(pid);
+    if (!p) {
+        printk(KERN_EMERG "Can't find target process with pid = %d!\n", pid);
+        return;
+    }
+    if (limit < 0 || limit > 100) {
+        printk(KERN_EMERG "Invalid limit value! Input limit = %d!\n", limit);
+        return;
+    }
+    if(limit == 0)
+        p->limit = 100;
+    else
+        p->limit = limit;
+    return p->limit;
 }

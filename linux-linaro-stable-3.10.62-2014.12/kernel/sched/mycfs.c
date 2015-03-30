@@ -43,8 +43,8 @@ const struct sched_class mycfs_sched_class;
  */
 #define SRR(x, y) (((x) + (1UL << ((y) - 1))) >> (y))
 
-#define TOTAL   100ULL
-#define RATIO   35ULL
+#define TOTAL   100
+#define RATIO   100
 #define BASE    1000000ULL
 
 /*
@@ -726,6 +726,8 @@ static void set_curr_task_mycfs(struct rq *rq)
 static void switched_to_mycfs(struct rq *rq, struct task_struct *p)
 {
     printk(KERN_EMERG "switched to mycfs scheduler!\n");
+    p->sched_reset_on_fork = 0;
+    p->limit = RATIO;
     if (!p->se.on_rq)
         return;
     
@@ -830,9 +832,6 @@ set_next_entity(struct mycfs_rq *mycfs_rq, struct sched_entity *se)
     update_stats_curr_start(mycfs_rq, se);
     mycfs_rq->curr = se;
     
-    
-//    printk(KERN_EMERG "pick once! this runtime is %llu\n", (se->sum_exec_runtime - se->prev_sum_exec_runtime));
-    
     se->prev_sum_exec_runtime = se->sum_exec_runtime;
 }
 
@@ -849,10 +848,11 @@ static struct task_struct *pick_next_task_mycfs(struct rq *rq)
     
     se = pick_next_entity(mycfs_rq);
     
-    if (task_of(se) -> enough) {
-        u64 dead_time = rq_of(mycfs_rq)->clock_task - task_of(mycfs_rq->jobs[i])->quit_time;
-        if (dead_time >= (TOTAL - RATIO) * BASE) {
-            task_of(mycfs_rq->jobs[i])->enough = 0;
+    p = task_of(se);
+    if (p -> enough) {
+        u64 dead_time = rq_of(mycfs_rq)->clock_task - p->quit_time;
+        if (dead_time >= (TOTAL - p->limit) * BASE) {
+            p->enough = 0;
         }
         else
         {
@@ -861,8 +861,6 @@ static struct task_struct *pick_next_task_mycfs(struct rq *rq)
     }
     
     set_next_entity(mycfs_rq, se);
-    
-    p = task_of(se);
 
     int num;
     num = 0;
@@ -872,6 +870,7 @@ static struct task_struct *pick_next_task_mycfs(struct rq *rq)
         }
     }
     
+//    printk(KERN_EMERG "pick once! pid is %d, runtime is %llu, limit = %d\n", p->pid, se->sum_exec_runtime, p->limit);
     return p;
 }
 
@@ -881,11 +880,15 @@ static struct task_struct *pick_next_task_mycfs(struct rq *rq)
 static void
 check_preempt_tick(struct mycfs_rq *mycfs_rq, struct sched_entity *curr)
 {
-    unsigned long ideal_runtime, delta_exec;
+    u64 ideal_runtime, delta_exec;
     struct sched_entity *se;
     s64 delta;
     
     ideal_runtime = sched_slice(mycfs_rq, curr);
+    
+    printk(KERN_EMERG "pid is %d, ideal runtime is %llu, limit = %d\n", task_of(curr)->pid, ideal_runtime, task_of(curr)->limit);
+    
+    
     delta_exec = curr->sum_exec_runtime - curr->prev_sum_exec_runtime;
 //    ideal_runtime = RATIO * BASE;
     if (delta_exec > ideal_runtime) {
@@ -937,7 +940,7 @@ entity_tick(struct mycfs_rq *mycfs_rq, struct sched_entity *curr, int queued)
         
         delta_exec = curr->sum_exec_runtime - curr->prev_sum_exec_runtime;
 //        printk(KERN_EMERG "From entity_tick 1! current clock is %llu\n", rq_of(mycfs_rq)->clock_task);
-        ideal_runtime = RATIO * BASE;
+        ideal_runtime = task_of(curr)->limit * BASE;
         if (delta_exec > ideal_runtime) {
             task_of(curr)->enough = 1;
             task_of(curr)->quit_time = rq_of(mycfs_rq)->clock_task;
@@ -1012,15 +1015,14 @@ void check_task_mycfs(struct rq *rq)
 {
     int i;
     struct mycfs_rq *mycfs_rq = &rq->mycfs;
-    for (i = 0; i < MAX_JOBS_IN_MYCFS; i ++) {
-        if (mycfs_rq->jobs[i] != NULL) {
-//            printk(KERN_EMERG "From check_task_mycfs! current clock is %llu\n", rq->clock_task);
-            if (task_of(mycfs_rq->jobs[i])->enough) {
-                u64 dead_time = rq->clock_task - task_of(mycfs_rq->jobs[i])->quit_time;
-                if (dead_time >= (TOTAL - RATIO) * BASE) {
-                    task_of(mycfs_rq->jobs[i])->enough = 0;
-                    resched_task(rq->curr);
-                }
+    
+    if (mycfs_rq->least)
+    {
+        if (task_of(mycfs_rq->least)->enough) {
+            u64 dead_time = rq->clock_task - task_of(mycfs_rq->least)->quit_time;
+            if (dead_time >= (TOTAL - task_of(mycfs_rq->least)->limit) * BASE) {
+                task_of(mycfs_rq->least)->enough = 0;
+                resched_task(rq->curr);
             }
         }
     }
