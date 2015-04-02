@@ -1117,7 +1117,9 @@ void check_task_mycfs(struct rq *rq)
         u64 dead_time = rq->clock_task - task_of(entry)->quit_time;
         if (dead_time >= (TOTAL - task_of(entry)->limit) * BASE) {
             task_of(entry)->enough = 0;
-            resched_task(rq->curr);
+            if (mycfs_rq->curr == NULL) {
+                resched_task(rq->curr);
+            }
         }
     }
     next = rb_next(&entry->run_node);
